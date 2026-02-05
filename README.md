@@ -35,6 +35,7 @@ Canton Coin Flip BOT By Nightly Wallet is an automated tool designed to playing 
 - ⏰ **Daily Check-In** - Automated claim daily check-in
 - 🪙 **Play Coin Flip** - Automated playing coin flip game
 - 👥 **Multi-Account Support** - Manage multiple accounts simultaneously
+- 🔔 **Telegram Notification** - Automatically send notifications on telegram bot father
 
 ## 📋 Requirements
 
@@ -88,6 +89,15 @@ Create or edit `accounts.txt` in the project directory:
 your_canton_nightly_private_key_1
 your_canton_nightly_private_key_2
 your_canton_nightly_private_key_3
+```
+
+### TG BOT Setup
+
+Create or edit `.env` in the project directory (optional):
+
+```
+TG_TOKEN=123:xxxxxxxxxxxxx
+TG_CHAT_ID=123
 ```
 
 ### Proxy Configuration (Optional)

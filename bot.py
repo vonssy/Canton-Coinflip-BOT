@@ -8,9 +8,12 @@ from aiohttp_socks import ProxyConnector
 from base58 import b58decode
 from base64 import b64decode, b64encode
 from nacl.signing import SigningKey
+from dotenv import load_dotenv
 from datetime import datetime
 from colorama import *
 import asyncio, random, time, pytz, sys, re, os
+
+load_dotenv()
 
 wib = pytz.timezone('Asia/Jakarta')
 
@@ -24,6 +27,8 @@ class Canton:
         self.HEADERS = {}
         self.USE_PROXY = False
         self.ROTATE_PROXY = False
+        self.TG_TOKEN = os.getenv("TG_TOKEN")
+        self.TG_CHAT_ID = os.getenv("TG_CHAT_ID")
         self.proxies = []
         self.proxy_index = 0
         self.account_proxies = {}
@@ -73,6 +78,16 @@ class Canton:
             with open(filename, 'r') as file:
                 accounts = [line.strip() for line in file if line.strip()]
             return accounts
+        except Exception as e:
+            print(f"{Fore.RED + Style.BRIGHT}Failed To Load Accounts: {e}{Style.RESET_ALL}")
+            return None
+    
+    def load_tg_tokens(self):
+        filename = "telegram_token.txt"
+        try:
+            with open(filename, 'r') as file:
+                telegram_token = file.readline().strip()
+            return telegram_token
         except Exception as e:
             print(f"{Fore.RED + Style.BRIGHT}Failed To Load Accounts: {e}{Style.RESET_ALL}")
             return None
@@ -276,6 +291,21 @@ class Canton:
             )
         
         return None
+    
+    async def send_telegram(self, text: str):
+        url = f"https://api.telegram.org/bot{self.TG_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": self.TG_CHAT_ID,
+            "text": text,
+            "parse_mode": "HTML"
+        }
+
+        try:
+            async with ClientSession(timeout=ClientTimeout(total=30)) as session:
+                async with session.post(url, json=payload) as resp:
+                    return await resp.text()
+        except Exception as e:
+            self.log(f"Telegram Error: {e}")
     
     async def auth_challenge(self, pub_key: str, proxy_url=None, retries=5):
         url = f"{self.API_URL['coinflip']}/auth/challenge"
@@ -713,7 +743,7 @@ class Canton:
             f"{Fore.WHITE+Style.BRIGHT} {self.API_URL['explorer']}{tx_hash} {Style.RESET_ALL}"
         )
 
-    def print_statistics(self):
+    async def print_statistics(self):
         separator = "=" * 60
         self.log(f"{Fore.CYAN+Style.BRIGHT}{separator}{Style.RESET_ALL}")
         
@@ -745,6 +775,21 @@ class Canton:
             f"{Fore.BLUE+Style.BRIGHT}Total Credits    :{Style.RESET_ALL}"
             f"{Fore.WHITE+Style.BRIGHT} {total_available_credits} © {Style.RESET_ALL}"
         )
+
+        if self.TG_TOKEN and self.TG_CHAT_ID:
+            msg = (
+                f"<b>📊 CANTON COINFLIP BOT STATISTICS</b>\n\n"
+                f"<pre>"
+                f"─────────────────────────────────────\n"
+                f"👥 Total Accounts     : {total_accounts}\n"
+                f"🟢 Active Accounts    : {active_accounts}\n"
+                f"🔴 Inactive Accounts  : {inactive_accounts}\n"
+                f"💰 Total Credits      : {total_available_credits} ©\n"
+                f"─────────────────────────────────────"
+                f"</pre>"
+            )
+
+            await self.send_telegram(msg)
 
         return [pub_key for pub_key, data in self.accounts.items() if data.get('credits', -1) == 0]
 
@@ -796,7 +841,7 @@ class Canton:
                     await self.process_accounts(private_key, pub_key)
                     await asyncio.sleep(random.uniform(1.5, 3.0))
 
-                self.print_statistics()
+                await self.print_statistics()
                 
                 remaining_accounts = [k for k, v in self.accounts.items() if 'private_key' in v]
                 if not remaining_accounts:
