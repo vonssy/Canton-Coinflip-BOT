@@ -11,24 +11,21 @@ from nacl.signing import SigningKey
 from dotenv import load_dotenv
 from datetime import datetime
 from colorama import *
-import asyncio, random, time, pytz, sys, re, os
+import asyncio, random, time, sys, re, os
 
 load_dotenv()
 
-wib = pytz.timezone('Asia/Jakarta')
-
 class Canton:
     def __init__(self) -> None:
-        self.API_URL = {
-            "coinflip": "https://mainnet.rpc.canton.nightly.app",
-            "explorer": "https://www.cantonscan.com/update/"
-        }
-        self.BET_SIZE = 1 # U can change it.
-        self.HEADERS = {}
+        self.API_URL = "https://mainnet.rpc.canton.nightly.app"
+        
+        self.BET_SIZE = int(os.getenv("BET_SIZE", "1"))
+        self.API_TOKEN = os.getenv("API_TOKEN")
+        self.CHAT_ID = os.getenv("CHAT_ID")
+
         self.USE_PROXY = False
         self.ROTATE_PROXY = False
-        self.TG_TOKEN = os.getenv("TG_TOKEN")
-        self.TG_CHAT_ID = os.getenv("TG_CHAT_ID")
+
         self.proxies = []
         self.proxy_index = 0
         self.account_proxies = {}
@@ -52,7 +49,7 @@ class Canton:
 
     def log(self, message):
         print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%X %Z')} ]{Style.RESET_ALL}"
+            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().strftime('%x %X')} ]{Style.RESET_ALL}"
             f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}{message}",
             flush=True
         )
@@ -78,16 +75,6 @@ class Canton:
             with open(filename, 'r') as file:
                 accounts = [line.strip() for line in file if line.strip()]
             return accounts
-        except Exception as e:
-            print(f"{Fore.RED + Style.BRIGHT}Failed To Load Accounts: {e}{Style.RESET_ALL}")
-            return None
-    
-    def load_tg_tokens(self):
-        filename = "telegram_token.txt"
-        try:
-            with open(filename, 'r') as file:
-                telegram_token = file.readline().strip()
-            return telegram_token
         except Exception as e:
             print(f"{Fore.RED + Style.BRIGHT}Failed To Load Accounts: {e}{Style.RESET_ALL}")
             return None
@@ -168,28 +155,23 @@ class Canton:
         return proxy_url
     
     def initialize_headers(self, pub_key: str):
-        if pub_key not in self.HEADERS:
-            self.HEADERS[pub_key] = {
-                "Accept": "*/*",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Host": "mainnet.rpc.canton.nightly.app",
-                "Origin": "https://coinflip.nightly.app",
-                "Pragma": "no-cache",
-                "Referer": "https://coinflip.nightly.app/",
-                "Sec-Fetch-Dest": "empty",
-                "Sec-Fetch-Mode": "cors",
-                "Sec-Fetch-Site": "same-site",
-                "User-Agent": random.choice(self.USER_AGENTS)
-            }
-
-        account_data = self.accounts.get(pub_key)
-        if account_data and account_data.get("token"):
-            self.HEADERS[pub_key]["Authorization"] = f"Bearer {account_data['token']}"
-
-        return self.HEADERS[pub_key].copy()
+        headers = {
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Host": "mainnet.rpc.canton.nightly.app",
+            "Origin": "https://coinflip.nightly.app",
+            "Pragma": "no-cache",
+            "Referer": "https://coinflip.nightly.app/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+            "User-Agent": self.accounts[pub_key]["user_agent"]
+        }
+        
+        return headers.copy()
     
     def gen_pubkey(self, private_key: str):
         try:
@@ -293,22 +275,24 @@ class Canton:
         return None
     
     async def send_telegram(self, text: str):
-        url = f"https://api.telegram.org/bot{self.TG_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{self.API_TOKEN}/sendMessage"
         payload = {
-            "chat_id": self.TG_CHAT_ID,
+            "chat_id": self.CHAT_ID,
             "text": text,
             "parse_mode": "HTML"
         }
 
         try:
-            async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                async with session.post(url, json=payload) as resp:
-                    return await resp.text()
+            async with ClientSession(timeout=ClientTimeout(total=60)) as session:
+                async with session.post(url, json=payload):
+                    return True
         except Exception as e:
             self.log(f"Telegram Error: {e}")
+            
+        return None
     
     async def auth_challenge(self, pub_key: str, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/auth/challenge"
+        url = f"{self.API_URL}/auth/challenge"
         
         for attempt in range(retries):
             connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
@@ -337,7 +321,7 @@ class Canton:
         return None
     
     async def auth_verify(self, private_key: str, pub_key: str, challenge: dict, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/auth/verify"
+        url = f"{self.API_URL}/auth/verify"
         
         for attempt in range(retries):
             connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
@@ -364,12 +348,13 @@ class Canton:
         return None
     
     async def get_party_id(self, pub_key: str, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/me"
+        url = f"{self.API_URL}/me"
         
         for attempt in range(retries):
             connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
             try:
                 headers = self.initialize_headers(pub_key)
+                headers["Authorization"] = f"Bearer {self.accounts[pub_key]['token']}"
 
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.get(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
@@ -388,40 +373,14 @@ class Canton:
 
         return None
     
-    async def perfrom_checkin(self, pub_key: str, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/performDailyCheckIn"
-        
-        for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
-            try:
-                headers = self.initialize_headers(pub_key)
-
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        await self.ensure_ok(response)
-                        return await response.json()
-            except (Exception, ClientResponseError, TimeoutError) as e:
-                if attempt < retries - 1:
-                    await asyncio.sleep(5)
-                    continue
-                self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
-                )
-                self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
-
-        return None
-    
     async def escrow_state(self, pub_key: str, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/queryEscrowState"
+        url = f"{self.API_URL}/queryEscrowState"
         
         for attempt in range(retries):
             connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
             try:
                 headers = self.initialize_headers(pub_key)
+                headers["Authorization"] = f"Bearer {self.accounts[pub_key]['token']}"
 
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.post(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
@@ -441,12 +400,13 @@ class Canton:
         return None
     
     async def req_initial_reward(self, pub_key: str, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/requestInitialReward"
+        url = f"{self.API_URL}/requestInitialReward"
         
         for attempt in range(retries):
             connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
             try:
                 headers = self.initialize_headers(pub_key)
+                headers["Authorization"] = f"Bearer {self.accounts[pub_key]['token']}"
 
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.post(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
@@ -466,12 +426,13 @@ class Canton:
         return None
     
     async def play_coin_flip(self, pub_key: str, bet_size: int, proxy_url=None, retries=5):
-        url = f"{self.API_URL['coinflip']}/playEscrowCoinFlip"
+        url = f"{self.API_URL}/playEscrowCoinFlip"
         
         for attempt in range(retries):
             connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
             try:
                 headers = self.initialize_headers(pub_key)
+                headers["Authorization"] = f"Bearer {self.accounts[pub_key]['token']}"
                 headers["Content-Type"] = "application/json"
                 payload = {
                     "betSize": bet_size
@@ -523,23 +484,6 @@ class Canton:
         if self.USE_PROXY:
             proxy_url = self.get_next_proxy_for_account(pub_key)
 
-        if pub_key not in self.accounts:
-            self.accounts[pub_key] = {'private_key': private_key}
-
-            challenge = await self.auth_challenge(pub_key, proxy_url)
-            if not challenge: return False
-
-            verify = await self.auth_verify(private_key, pub_key, challenge)
-            if not verify: return False
-
-            self.accounts[pub_key]['expires'] = verify.get("expiresAt")
-            self.accounts[pub_key]['token'] = verify.get("token")
-
-            self.log(
-                f"{Fore.CYAN+Style.BRIGHT}Login   :{Style.RESET_ALL}"
-                f"{Fore.GREEN+Style.BRIGHT} Success {Style.RESET_ALL}"
-            )
-
         if int(time.time()) > self.accounts[pub_key].get('expires', 0):
             challenge = await self.auth_challenge(pub_key, proxy_url)
             if not challenge: return False
@@ -577,7 +521,6 @@ class Canton:
         state = await self.escrow_state(pub_key, proxy_url)
         if not state: return False
 
-        contract_id = state.get("contractId")
         total_credits = state.get("totalCredits")
         available_credits = state.get("availableCredits")
         credits_used = state.get("creditsUsed")
@@ -597,77 +540,75 @@ class Canton:
             f"{Fore.WHITE+Style.BRIGHT} {credits_used} © {Style.RESET_ALL}"
         )
 
-        if initial_reward_claimed:
+        if not initial_reward_claimed:
+            req_rewards = await self.req_initial_reward(pub_key, proxy_url)
+            if req_rewards:
+                msg = req_rewards.get("message")
+
+                if req_rewards.get("success"):
+                    total_credits = req_rewards.get("state", {}).get("totalCredits")
+                    available_credits = req_rewards.get("state", {}).get("availableCredits")
+                    credits_used = req_rewards.get("state", {}).get("creditsUsed")
+                    
+                    self.log(
+                        f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
+                        f"{Fore.GREEN+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                    )
+                else:
+                    self.log(
+                        f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
+                        f"{Fore.RED+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                    )
+        else:
             self.log(
                 f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
                 f"{Fore.YELLOW+Style.BRIGHT} Already Claimed {Style.RESET_ALL}"
             )
-        else:
-            req_rewards = await self.req_initial_reward(pub_key, proxy_url)
-            if not req_rewards: return False
-
-            msg = req_rewards.get("message")
-
-            if not req_rewards.get("success"):
-                self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} {msg} {Style.RESET_ALL}"
-                )
-                return False
             
-            contract_id = req_rewards.get("state", {}).get("contractId")
-            total_credits = req_rewards.get("state", {}).get("totalCredits")
-            available_credits = req_rewards.get("state", {}).get("availableCredits")
-            credits_used = req_rewards.get("state", {}).get("creditsUsed")
-            
-            self.log(
-                f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
-                f"{Fore.GREEN+Style.BRIGHT} {msg} {Style.RESET_ALL}"
-            )
+            self.log(f"{Fore.CYAN+Style.BRIGHT}Faucet  :{Style.RESET_ALL}")
 
-        self.log(f"{Fore.CYAN+Style.BRIGHT}Check-In:{Style.RESET_ALL}")
+            can_claim_faucet = state.get("canClaimFaucet")
+            if can_claim_faucet:
 
-        checkin = await self.perfrom_checkin(pub_key, proxy_url)
-        if checkin:
-            msg = checkin.get("message")
+                req_rewards = await self.req_initial_reward(pub_key, proxy_url)
+                if req_rewards:
+                    msg = req_rewards.get("message")
 
-            if checkin.get("success"):
-                tx_hash = checkin.get("txHash")
+                    if req_rewards.get("success"):
+                        total_credits = req_rewards.get("state", {}).get("totalCredits")
+                        available_credits = req_rewards.get("state", {}).get("availableCredits")
+                        credits_used = req_rewards.get("state", {}).get("creditsUsed")
 
-                if tx_hash:
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
-                        f"{Fore.GREEN+Style.BRIGHT} Success {Style.RESET_ALL}"
-                    )
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} {msg} {Style.RESET_ALL}"
-                    )
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Tx Hash :{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} {tx_hash} {Style.RESET_ALL}"
-                    )
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Explorer:{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} {self.API_URL['explorer']}{tx_hash} {Style.RESET_ALL}"
-                    )
-                else:
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
-                        f"{Fore.YELLOW+Style.BRIGHT} Failed {Style.RESET_ALL}"
-                    )
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} {msg} {Style.RESET_ALL}"
-                    )
+                        self.log(
+                            f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
+                            f"{Fore.GREEN+Style.BRIGHT} Success {Style.RESET_ALL}"
+                        )
+                        self.log(
+                            f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
+                            f"{Fore.WHITE+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                        )
+                    else:
+                        self.log(
+                            f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
+                            f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
+                        )
+                        self.log(
+                            f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
+                            f"{Fore.YELLOW+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                        )
             else:
+                next_claim = state.get("nextClaimAt")
+                formatted_next_claim = datetime.fromisoformat(
+                    next_claim.replace("Z", "+00:00")
+                ).astimezone().strftime('%x %X')
+
                 self.log(
                     f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT} Already Claimed {Style.RESET_ALL}"
                 )
                 self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                    f"{Fore.BLUE+Style.BRIGHT}   Next At :{Style.RESET_ALL}"
+                    f"{Fore.WHITE+Style.BRIGHT} {formatted_next_claim} {Style.RESET_ALL}"
                 )
     
         self.log(f"{Fore.CYAN+Style.BRIGHT}CoinFlip:{Style.RESET_ALL}")
@@ -709,7 +650,6 @@ class Canton:
 
         user_won = flip.get("userWon")
         outcome = flip.get("outcome")
-        tx_hash = flip.get("txHash")
         available_credits_after = flip.get("escrowState", {}).get("availableCredits")
         
         if available_credits_after is not None:
@@ -733,14 +673,6 @@ class Canton:
         self.log(
             f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
             f"{Fore.WHITE+Style.BRIGHT} {msg} {Style.RESET_ALL}"
-        )
-        self.log(
-            f"{Fore.BLUE+Style.BRIGHT}   Tx Hash :{Style.RESET_ALL}"
-            f"{Fore.WHITE+Style.BRIGHT} {tx_hash} {Style.RESET_ALL}"
-        )
-        self.log(
-            f"{Fore.BLUE+Style.BRIGHT}   Explorer:{Style.RESET_ALL}"
-            f"{Fore.WHITE+Style.BRIGHT} {self.API_URL['explorer']}{tx_hash} {Style.RESET_ALL}"
         )
 
     async def print_statistics(self):
@@ -776,7 +708,7 @@ class Canton:
             f"{Fore.WHITE+Style.BRIGHT} {total_available_credits} © {Style.RESET_ALL}"
         )
 
-        if self.TG_TOKEN and self.TG_CHAT_ID:
+        if self.API_TOKEN and self.CHAT_ID:
             msg = (
                 f"<b>📊 CANTON COINFLIP BOT STATISTICS</b>\n\n"
                 f"<pre>"
@@ -796,7 +728,9 @@ class Canton:
     async def main(self):
         try:
             accounts = self.load_accounts()
-            if not accounts: return
+            if not accounts: 
+                self.log(f"{Fore.RED+Style.BRIGHT}No Accounts Loaded.{Style.RESET_ALL}")
+                return
 
             self.print_question()
             self.clear_terminal()
@@ -811,7 +745,10 @@ class Canton:
             for private_key in accounts:
                 pub_key = self.gen_pubkey(private_key)
                 if pub_key and pub_key not in self.accounts:
-                    self.accounts[pub_key] = {'private_key': private_key}
+                    self.accounts[pub_key] = {
+                        'private_key': private_key,
+                        'user_agent': random.choice(self.USER_AGENTS)
+                    }
 
             separator = "=" * 25
             while True:
@@ -839,7 +776,6 @@ class Canton:
                         continue
 
                     await self.process_accounts(private_key, pub_key)
-                    await asyncio.sleep(random.uniform(1.5, 3.0))
 
                 await self.print_statistics()
                 
@@ -853,8 +789,6 @@ class Canton:
         except Exception as e:
             self.log(f"{Fore.RED+Style.BRIGHT}Error: {e}{Style.RESET_ALL}")
             raise e
-        except asyncio.CancelledError:
-            raise
 
 if __name__ == "__main__":
     try:
@@ -862,9 +796,8 @@ if __name__ == "__main__":
         asyncio.run(bot.main())
     except KeyboardInterrupt:
         print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%X %Z')} ]{Style.RESET_ALL}"
+            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().strftime('%x %X')} ]{Style.RESET_ALL}"
             f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
             f"{Fore.RED + Style.BRIGHT}[ EXIT ] Canton Coin Flip - BOT{Style.RESET_ALL}                                       "                              
         )
-    finally:
-        sys.exit(0)
+        sys.exit(1)

@@ -1,6 +1,6 @@
-# 🚀 Canton Coin Flip BOT By Nightly Wallet
+# 🚀 Canton Coinflip BOT By Nightly Wallet
 
-> Automated claim daily check-in and multi-account management
+> Automated playing coinflip game and multi-account management
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -20,7 +20,7 @@
 
 ## 🎯 Overview
 
-Canton Coin Flip BOT By Nightly Wallet is an automated tool designed to playing coin flip game across multiple accounts. It provides seamless offers robust proxy support for enhanced security and reliability.
+Canton Coinflip BOT By Nightly Wallet is an automated tool designed to playing coinflip game across multiple accounts. It provides seamless offers robust proxy support for enhanced security and reliability.
 
 **🔗 Get Started:** [Register on Coinflip By Nightly Wallet](https://coinflip.nightly.app/)
 
@@ -32,8 +32,8 @@ Canton Coin Flip BOT By Nightly Wallet is an automated tool designed to playing 
 - 🌐 **Flexible Proxy Support** - Run with or without proxy configuration
 - 🔀 **Smart Proxy Rotation** - Automatic rotation of invalid proxies
 - 💰 **Initial Reward** - Automated claim initial credits reward
-- ⏰ **Daily Check-In** - Automated claim daily check-in
-- 🪙 **Play Coin Flip** - Automated playing coin flip game
+- ⏰ **Daily Faucet** - Automated claim daily faucet
+- 🪙 **Play Coinflip** - Automated playing coinflip game
 - 👥 **Multi-Account Support** - Manage multiple accounts simultaneously
 - 🔔 **Telegram Notification** - Automatically send notifications on telegram bot father
 
@@ -96,8 +96,9 @@ your_canton_nightly_private_key_3
 Create or edit `.env` in the project directory (optional):
 
 ```
-TG_TOKEN=123:xxxxxxxxxxxxx
-TG_CHAT_ID=123
+BET_SIZE=1
+API_TOKEN=0123456789:xxxxxxxxxxxxx
+CHAT_ID=9876543210
 ```
 
 ### Proxy Configuration (Optional)
@@ -173,6 +174,6 @@ We welcome contributions from the community! Here's how you can help:
 
 **Made with ❤️ by [vonssy](https://github.com/vonssy)**
 
-*Thank you for using Canton Coin Flip BOT By Nightly Wallet! Don't forget to ⭐ star this repository.*
+*Thank you for using Canton Coinflip BOT By Nightly Wallet! Don't forget to ⭐ star this repository.*
 
 </div>
