@@ -23,6 +23,8 @@ class Canton:
         self.API_TOKEN = os.getenv("API_TOKEN")
         self.CHAT_ID = os.getenv("CHAT_ID")
 
+        self.BET_LISTS = [ 1, 2, 5, 10, 20, 25, 50, 100 ]
+
         self.USE_PROXY = False
         self.ROTATE_PROXY = False
 
@@ -614,25 +616,44 @@ class Canton:
         self.log(f"{Fore.CYAN+Style.BRIGHT}CoinFlip:{Style.RESET_ALL}")
 
         self.log(
-            f"{Fore.BLUE+Style.BRIGHT}   Payout  :{Style.RESET_ALL}"
-            f"{Fore.WHITE+Style.BRIGHT} {self.BET_SIZE} © {Style.RESET_ALL}"
-        )
-        self.log(
             f"{Fore.BLUE+Style.BRIGHT}   Credits :{Style.RESET_ALL}"
             f"{Fore.WHITE+Style.BRIGHT} {available_credits} © {Style.RESET_ALL}"
         )
 
-        if available_credits < self.BET_SIZE:
-            self.accounts[pub_key]['credits'] = 0
+        bet_size = self.BET_SIZE
+
+        if available_credits < bet_size:
+            affordable = [bet for bet in self.BET_LISTS if bet <= available_credits]
+
+            if not affordable:
+                self.accounts[pub_key]['credits'] = 0
+                self.log(
+                    f"{Fore.BLUE+Style.BRIGHT}   Payout  :{Style.RESET_ALL}"
+                    f"{Fore.WHITE+Style.BRIGHT} 0 © {Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT}(Adjusted){Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
+                    f"{Fore.YELLOW+Style.BRIGHT} Insufficient Credits {Style.RESET_ALL}"
+                )
+                return False
+
+            bet_size = max(affordable)
             self.log(
-                f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
-                f"{Fore.YELLOW+Style.BRIGHT} Insufficient Credits {Style.RESET_ALL}"
+                f"{Fore.BLUE+Style.BRIGHT}   Payout  :{Style.RESET_ALL}"
+                f"{Fore.WHITE+Style.BRIGHT} {bet_size} © {Style.RESET_ALL}"
+                f"{Fore.YELLOW+Style.BRIGHT}(Adjusted){Style.RESET_ALL}"
             )
-            return False
-        
+
+        else:
+            self.log(
+                f"{Fore.BLUE+Style.BRIGHT}   Payout  :{Style.RESET_ALL}"
+                f"{Fore.WHITE+Style.BRIGHT} {bet_size} © {Style.RESET_ALL}"
+            )
+
         self.accounts[pub_key]['credits'] = available_credits
 
-        flip = await self.play_coin_flip(pub_key, self.BET_SIZE, proxy_url)
+        flip = await self.play_coin_flip(pub_key, bet_size, proxy_url)
         if not flip: return False
 
         msg = flip.get("message", "Unknown")
