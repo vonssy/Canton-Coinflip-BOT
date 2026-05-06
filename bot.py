@@ -274,7 +274,7 @@ class Canton:
                 f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
             )
         
-        return None
+            return None
     
     async def send_telegram(self, text: str):
         url = f"https://api.telegram.org/bot{self.API_TOKEN}/sendMessage"
@@ -320,7 +320,7 @@ class Canton:
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
 
-        return None
+                return None
     
     async def auth_verify(self, private_key: str, pub_key: str, challenge: dict, proxy_url=None, retries=5):
         url = f"{self.API_URL}/auth/verify"
@@ -347,7 +347,7 @@ class Canton:
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
 
-        return None
+                return None
     
     async def get_party_id(self, pub_key: str, proxy_url=None, retries=5):
         url = f"{self.API_URL}/me"
@@ -373,7 +373,7 @@ class Canton:
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
 
-        return None
+                return None
     
     async def escrow_state(self, pub_key: str, proxy_url=None, retries=5):
         url = f"{self.API_URL}/queryEscrowState"
@@ -399,7 +399,7 @@ class Canton:
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
 
-        return None
+                return None
     
     async def req_initial_reward(self, pub_key: str, proxy_url=None, retries=5):
         url = f"{self.API_URL}/requestInitialReward"
@@ -415,17 +415,20 @@ class Canton:
                         await self.ensure_ok(response)
                         return await response.json()
             except (Exception, ClientResponseError, TimeoutError) as e:
-                if attempt < retries - 1:
-                    await asyncio.sleep(5)
-                    continue
+                if "429" not in str(e):
+                    if attempt < retries - 1:
+                        await asyncio.sleep(5)
+                        continue
                 self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed to Claim {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                    f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
 
-        return None
+                return None
     
     async def play_coin_flip(self, pub_key: str, bet_size: int, proxy_url=None, retries=5):
         url = f"{self.API_URL}/playEscrowCoinFlip"
@@ -457,7 +460,7 @@ class Canton:
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
 
-        return None
+                return None
     
     async def process_check_connection(self, pub_key: str, proxy_url: None):
         while True:
@@ -542,6 +545,8 @@ class Canton:
             f"{Fore.WHITE+Style.BRIGHT} {credits_used} © {Style.RESET_ALL}"
         )
 
+        self.log(f"{Fore.CYAN+Style.BRIGHT}Faucet  :{Style.RESET_ALL}")
+
         if not initial_reward_claimed:
             req_rewards = await self.req_initial_reward(pub_key, proxy_url)
             if req_rewards:
@@ -553,22 +558,23 @@ class Canton:
                     credits_used = req_rewards.get("state", {}).get("creditsUsed")
                     
                     self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
-                        f"{Fore.GREEN+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                        f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
+                        f"{Fore.GREEN+Style.BRIGHT} Success {Style.RESET_ALL}"
+                    )
+                    self.log(
+                        f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
+                        f"{Fore.WHITE+Style.BRIGHT} {msg} {Style.RESET_ALL}"
                     )
                 else:
                     self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
-                        f"{Fore.RED+Style.BRIGHT} {msg} {Style.RESET_ALL}"
+                        f"{Fore.BLUE+Style.BRIGHT}   Status  :{Style.RESET_ALL}"
+                        f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
+                    )
+                    self.log(
+                        f"{Fore.BLUE+Style.BRIGHT}   Message :{Style.RESET_ALL}"
+                        f"{Fore.YELLOW+Style.BRIGHT} {msg} {Style.RESET_ALL}"
                     )
         else:
-            self.log(
-                f"{Fore.BLUE+Style.BRIGHT}   Initial Reward   :{Style.RESET_ALL}"
-                f"{Fore.YELLOW+Style.BRIGHT} Already Claimed {Style.RESET_ALL}"
-            )
-            
-            self.log(f"{Fore.CYAN+Style.BRIGHT}Faucet  :{Style.RESET_ALL}")
-
             can_claim_faucet = state.get("canClaimFaucet")
             if can_claim_faucet:
 
